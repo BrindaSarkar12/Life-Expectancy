@@ -1,0 +1,303 @@
+---
+title: "IMT573–Data Science I– Final exam"
+author: "Brinda Sarkar"
+date: "12/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Data exploration and multiple regression
+
+### 1.1 Explore life expectancy
+
+##### 1. Explain what is life expectancy? Here we talk about period life expectancy at birth, not cohort life expectancy.
+Life expectancy is a statistical measure of the average time an organism is expected to live, based on the year of its birth, its current age, and other demographic factors like sex. Life expectancy at birth reflects the overall mortality level of a population. It summarizes the mortality pattern that prevails across all age groups - children and adolescents, adults and the elderly.Period life expectancy assumes mortality rates remain constant into the future. (Source: Wikipedia, WHO)
+
+##### 2. Load and clean the data–remove all cases with missing life expectancy, year and country name or code. You may have to return here later to improve cleaning if you discover more issues below. How many good cases do we have?
+```{r}
+life <- read.delim("gapminder.csv.bz2")
+head(life, 3)
+dim(life)
+sum(is.na(life$name))
+sum(is.na(life$iso3))
+sum(is.na(life$iso2))
+sum(is.na(life$lifeExpectancy))
+sum(is.na(life$time))
+sum(is.na(life$fertilityRate))
+```
+It is observed that there are a total of 1325 missings in lifeExpectancy data and 36 missings in year data. 1307 Fertility rate data is also missing. There are no missing data in country(name), codes(iso2 and iso3). However there are some rows where no name has been provided ("") and some codes as well which are empty.
+```{r}
+library(tidyverse)
+life <- life %>% drop_na(time) %>% drop_na(lifeExpectancy) %>% drop_na(fertilityRate)
+dim(life)
+```
+After removing the rows with the missing data in time, life expectancy and fertility rate, we are left with 11698 rows.
+
+##### 3. Now it is time to do some brief exploration: (a) How many countries do we have in these data? (b) What is the first and last year with valid life expectancy data? (c) What is the lowest and highest life expectancy values? Which country/year do they correspond to? (d) If you did this correctly, you see that the shortest life expectancy corresponds to a well-known event. What is the event?
+
+a. 
+```{r}
+life <- life %>% filter(!name=="")  #filters out countries were no name has been provided.
+```
+
+```{r}
+length(unique(life$name)) #203
+```
+There are 203 unique countries in the data after removing rows with missing data. In the original data, there are 250 unique countries.
+
+b. 
+```{r}
+min(life$time)
+max(life$time)
+```
+The first year with a valid life expectancy is 1960, whereas the last year with a valid life expectancy is 2019.
+
+c.
+```{r}
+life %>% filter(lifeExpectancy==min(life$lifeExpectancy)| lifeExpectancy==max(life$lifeExpectancy))
+```
+It is observed that Cambodia has the least life expectancy value of 18.907, whereas San Marino has the highest life expectancy value of 85.41707.
+
+d.
+The shortest life expectancy 18.907 occurred in 1977 in Cambodia. This coincided with the Cambodian genocide, which took place between Apr 17, 1975 – Jan 7, 1979. The Cambodian genocide was the systematic persecution and killing of Cambodians by the Khmer Rouge under the leadership of Communist Party of Kampuchea general secretary Pol Pot, who radically pushed Cambodia towards an entirely self-sufficient agrarian socialist society. (Source: https://en.wikipedia.org/wiki/Cambodian_genocide)
+
+##### 4. Next, lets plot the life expectancy over time for all countries (there are many of them). Make a plot where you show life expectancy in each country versus time. Highlight the U.S., South Korea, Cambodia, and China on this graph. Choose yourself a few additional countries, and explain why do you think it is interested to look at those countries.
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+life_country <- life %>% 
+  filter((name=="Cambodia" | name=="China" | name=="United States of America"| name=="Korea (Democratic People's Republic of)" |name=="Iran (Islamic Republic of)" |name=="Viet Nam" |name=="Iraq"))
+
+ggplot() +
+  geom_line(data=life, aes(x=time, y=lifeExpectancy,group=name, alpha = 0.8))+
+  geom_line(data=life_country, aes(x=time, y=lifeExpectancy, colour = name, size=0.2))
+```
+
+
+
+
+Apart from USA, Cambodia, China and Korea, I have selected Vietnam, Iraq and Iran. It can be observed that there is a dip in life expectancy between 1980-1988 in Iran and Iraq, and a dip in life expectancy during the 1970s. The dip in Iran and Iraq was observed due to the war between Iran and Iraq between 1980-1988. The dip in Vietnam occurred due to the Vietnam war between 1970-1971.
+
+##### 5.Explain what do you see on the graph. What is the overall picture? How do the selected countries behave? Anything else interesting you see?
+
+It is observed that when a country faced any crisis, the life expectancy rate fell during that period. In general, with the passage of time, the life expectancy increased gradually. In some countries the life expectancy growth graph is steeper than other. The dips in graphs are observed in the following:
+
+1. Cambodia during 1977, due to the Cambodian genocide.
+2. Vietnam during 1970s due to the Vietnam war.
+3. Korea during 1990s due to famine.
+4. China during 1960s, due to the Great Chinese Famine.
+5. Iran and Iraq between 1980-1988, due to the Iran-Iraq war.
+
+Compared to all the other countries that I selected, the life expectancy is the highest in the USA and the lowest in the Cambodia. (Source: Wikipedia) 
+
+##### 6. Now Let’s look how are life expectancy and fertility related. Make a fertility rate versus life expectancy plot of all countries with selected countries highlighted. Use arrows to mark which way the time goes on the figure.
+```{r}
+ggplot()+
+  geom_line(data=life, aes(x=lifeExpectancy, y=fertilityRate), color='gray', alpha=10)+
+  geom_line(data=life_country, aes(x=lifeExpectancy, y=fertilityRate, colour = name),arrow=arrow(length = unit(0.2,"inches")))
+```
+
+##### 7. Comment the results. Where is the world going? Where are the highlighted countries going?
+It is observed that for most countries, the arrow tends to go upwards. The arrow tends to go upward for USA,China, Iran, and Vietnam. The arrows tend to go downwards for Iraq, Korea and  Cambodia. It is observed that in the world, the fertility rate is dropping and the life expectancy is increasing. People are living more than their parents did due to advancement in medical science. Women are choosing not to have children. This would lead to a decrease in population in a few years. The countries would have to deal with a huge number of retired people and there would be increased burden on the youth to maintain the economy.
+
+### 1.2 Model life expectancy
+
+##### 1. Display the distribution of life expectancy. How does it look like? Does it suggest you should use log-transformation? Explain!
+```{r}
+hist(life$lifeExpectancy, col = "steelblue", breaks = 50)
+```
+
+
+
+The life expectancy data is not normally distributed. The data is increasing gradually with a peak around 70 years and then it drops. The graph is left skewed. If we apply log transformation to this data, the graph will be even more skewed, thus we don't apply log transformation. 
+
+##### 2. Create a model where you explain life expectancy with just time
+```{r}
+life <- life %>% add_column(year_2000 = life$time-2000)
+head(life,3)
+```
+
+```{r}
+m <- lm(life$lifeExpectancy ~ life$year_2000)
+summary(m)
+```
+When year is 2000, the life expectancy is equal to 67.410196. When year is increased the by one unit, the life expectancy increases by 0.308814. Both the coefficients are observed to be statistically significant. 
+
+##### 3. Why does year −2000 make more sense?
+When we take year as it is, we find that the coefficients have become significantly small. When we subtract 2000 from the year, we get coefficient which are easier to deal with and have better numbers compared to year. Thus we stick to year-2000.
+
+##### 4. Interpret the results (both β0 and β1).
+β0 is 67.0337495, it is the life expectancy if the year is equal to 2000.
+β1 is 0.308893, with one unit increase in year, the life expectancy increases by 0.308893 units.
+
+##### 5. Now let’s move to multiple regression: estimate the model where you also add the continent (variable region):
+```{r}
+life <- life %>% filter(region=="Americas"|region== "Asia"|region=="Africa"|region=="Europe"|region=="Oceania")
+dim(life)  #removing regions with no values
+```
+```{r}
+life$region <- as.factor(life$region) # converting region to categorical variable
+head(life, 3)
+```
+```{r}
+m <- lm(life$lifeExpectancy ~ life$year_2000 +life$region)
+summary(m)
+```
+##### 6. Interpret the results. What do the region dummies mean? What is the reference category? How big is the time trend? Is it statistically significant? Is it different from what you saw in the previous model?
+The region dummies represent the various continents of the world. The reference category is the African region. All the coefficients are statistically significant. Compared to the previous model, the R^2 has improved to 0.6648. For the previous model, the R^2 was 0.2172. Small R2 indicate the model is not good  and high R2 shows that it predicts well. R2 for the second model is closer to 1 than the first model. Compared to the previous model, the effect of the time is not much, however it is slightly smaller than the previous question. It is seen that compared to the reference variable, Africa, all the other continents do well. Keeping all other variables constant, it is observed that, the life expectancy of Europe is 20.899936 units higher than Africa. Similarly, keeping all other variables constant, the life expectancy of Americas is 15.932826 units higher than Africa. Among all the continents, keeping all other variables constant, the life expectancy is highest for Europe. For Africa, the life expectancy was 55.867 units in the year 2000.    
+ 
+
+##### 7. As a final result, let’s add two additional variables to the model: log of GDP per capita, and fertility rate. Estimate such a model.
+
+```{r}
+m <- lm(life$lifeExpectancy ~ life$year_2000 +life$region+log(life$GDP_PC)+life$fertilityRate)
+summary(m)
+```
+##### 8. What do the estimated parameters (betas) for the two new variables tell you?
+The reference variable here is Africa. All the estimated parameters are statistically significant. It is observed that all the variables are positively related to the life expectancy, only fertility rate is negatively related to the life expectancy. It mean that with one unit rise in fertility rate, the life expectancy is expected to reduce by 2.23512, keeping all other variables constant. The log of GDP is positively related to the life expectancy, this logic is intuitive. Regions with better GDP, are expected to have better life expectancy rates. With one unit rise in the log of GDP, the life expectancy increases by 2.49027, provided all other variables are constant. It is also observed that the R^2 has further increased to 0.8472. This shows that the model can predict well. It is seen that the time effect decreases to 0.13778 compared to the previous model.
+
+
+##### 9. If you did it correctly, you noticed that Europe was the leading region in Question 5. But now Americas is leading the pack in terms of the value of the region dummy–the dummy for Europe is only 4th largest. Explain why adding additional variables made the ranking of continents to look different.
+It is observed that Europe was the leading region and Americas was second in Ques 5, by adding two more variables - log of GDP and fertility rate, Americas became first while Europe took the 4th position. It happened due to the addition of the additional variables. An estimated beta will not change when a new variable is added, if the variables are uncorrelated. In our ques, the variable changes because the variables are correlated. The amount of change is a function of the magnitudes of the two correlations. Adding additional variables always change the coefficients of the previous variables. 
+
+This happens due to Simpson's paradox. Simpson's paradox, also called Yule-Simpson effect, in statistics, an effect that occurs when the marginal association between two categorical variables is qualitatively different from the partial association between the same two variables after controlling for one or more other variables.(https://www.britannica.com/topic/Simpsons-paradox)
+
+##### 10. Based on all the models you have done so far: which continent has the highest life expectancy? Which one the lowest?
+Based on the models, I would go with the third model, as the R^2 is the highest compared to the other two models. The continent with the highest life expectancy is Americas and the continent with the lowest life expectancy is Africa. 
+
+## 2. Find Cheap Restaurants 
+
+##### 1. Load the data and perform basic sanity checks. Ensure you know the variables. Check for missings and unreasonable values and clean the data as necessary.
+
+```{r}
+cheap_rest <- read.delim("nyc-italian-cheap.csv.bz2")
+head(cheap_rest)
+dim(cheap_rest)
+sum(is.na(cheap_rest$Food))
+sum(is.na(cheap_rest$Decor))
+sum(is.na(cheap_rest$Service))
+sum(is.na(cheap_rest$East))
+sum(is.na(cheap_rest$Cheap))
+summary(cheap_rest)
+```
+It is observed that there are no missing values in the data set.I didn't observe any unreasonable values.
+
+##### 2. Your task is to predict if a restaurant is cheap or not. Which type of model, linear or logistic regression do you think is suitable for this task? Explain!
+
+Since the prediction is a binary value (yes or no), we would use a logistic regression model.Logistic regression is used when the dependent variable is categorical.  
+
+##### 3. Now build the model. Include all the variables you consider relevant for this task. Estimate the model and interpret the statistically significant results. Do your results align with common sense?
+
+```{r}
+m1 <- glm(Cheap ~ Food + Decor + Service, family=binomial(), data=cheap_rest)
+summary(m1)
+```
+```{r}
+library(margins)
+me <- margins(m1)
+summary(me)
+```
+It is observed that with 1 unit better decor, the restaurant has 0.0847 pct points lesser chances of being classified as a cheap restaurant, provided the food and the service is the same. This is expected, restaurants with better decor are usually expensive. With 1 unit better food, the restaurant has 0.0643 pct points lesser chances of being classified as a cheap restaurant, provided the decor and the service is the same. This is also expected, Restaurants which provide better food are expected to charge its customers more than restaurants that provide not so good food. With one unit rise in service, the restaurant has 0.005 pct points more chances of being classified as a cheap restaurant provided all other factor - food and service remains the same. This is something that was not expected. With better services, the restaurant charges are bound to increase. 
+
+##### 4. You are going out with a few friends and get hungry, and would like to have lunch at a not-too-expensive Italian place. You find there are two new places with the following scores and locations. What does your model predict–is any of these two restaurants a cheap place? Use the model you made above to find it out.
+```{r}
+m2 <- glm(cheap_rest$Cheap~Decor + Food + Service, data=cheap_rest, family = binomial())
+#summary(m2)
+newdata <- data.frame(Decor=c(17,15), Food=c(23,18), Service=c(22,24))
+Chat <- predict(m2, newdata=newdata, type = "response")
+head(Chat)
+```
+The model predicts that the first restaurant "Assagio Ristorante" is expensive while the second restaurant "Altura", is cheap.
+
+## Theoretical questions
+
+##### 1. Describe one real-life applications in which logistic regression may be useful, one in which linear regression is useful, and one in which prediction is useful. Describe the response, as well as the predictors. Explain your answer.
+
+Logistic Regression: Logistic regression can be used widely by banks to determine if a person should be given a loan or not based on the credit score. In this case, the prediction would be in yes or no, the predictors can be bank balance, credit score, credit history, age, yearly salary and any past loans. Credit history and credit history would give a good sense of the person's past history with credit. Bank balance and yearly salary will give a good estimate of the person's ability to repay the loan. The person's age would suggest how many years he can still work to repay the loan. Any past loan amount pending would help the bank know his current liabilities.
+
+Linear Regression: Linear regression can be used to estimate how much advertisement spending can lead to revenue earned. In this case, the predictors would be spending on advertisement, time of the product released. For example, a sweater advertised in summer would not earn the expected amount of revenue that it could earn when sold and advertised in winter. 
+
+Prediction: Regression prediction can be used to determine property prices. For this the predictors would be location of the house, the number of schools, shopping markets near the house, the age and condition of the house, number of bedrooms, number of bathrooms and additional features like a garden or a Jacuzzi in the property. 
+
+##### 2. Think about analyzing regression results. What does this mean: A coefficient is statistically significant at 5% confidence level?
+
+If the significance level is 5%, it means that the confidence interval is 95%. If the P-value of the coefficient is less than the significance (alpha) level, the hypothesis test is statistically significant. If the confidence interval does not contain the null hypothesis value, the results are statistically significant.
+
+##### 3. You are network security manager. Your network has recently suffered from various attacks and intrusions and now you are evaluating to introduce a new login method, either method L1 or method L2. The login will distinguish between approved users (A) and intruders (I) based on passwords, biometrics and other data.
+##### a. Show the confusion matrices for methods L1 and L2. Do it as markdown tables!
+
+L1
+
+| | | Predicted | |
+|--------|----------|-----------|----------|
+| | | NEGATIVE(A) | POSITIVE(I) |
+|**Actual** | NEGATIVE(A) | 3 | 0 |
+| | POSITIVE(I) | 3 | 4 |
+
+L2
+
+| | | Predicted | |
+|--------|----------|-----------|----------|
+| | | NEGATIVE(A) | POSITIVE(I) |
+|**Actual** | NEGATIVE(A) | 2 | 1 |
+| | POSITIVE(I) | 0 | 7 |
+
+##### b. Compute accuracy, precision, recall for both models.
+
+Accuracy = (TP+TN)/total
+
+Precision = TP/(TP+FP)
+
+Recall = TP/(TP+FN)
+
+L1
+
+```{r}
+acc <-  (4+3)/(10)
+pres <- 4/4
+recall <- 4/7
+acc
+pres
+recall
+```
+For L1, the accuracy is 70%, the precision is 100% and the recall is 57.14286%.
+
+
+L2
+```{r}
+acc <-  (7+2)/(10)
+pres <- 7/8
+recall <- 7/7
+acc
+pres
+recall
+```
+
+For L2, the accuracy is 90%, the precision is 87.5% and the recall is 100%.
+
+##### c. Which login method, L1 or L2 will you recommend the management to implement? Explain your reasoning!
+
+In method L1, the model predicts 4 actual intruders as intruders but it also predict 3 actual intruder as authorized user. 
+I would recommend login method L2. The method perfectly identifies all the 7 intruders. However, it identifies one authorized user as an intruder. It is better to be safe than sorry, thus I would go with method L2, it is better to predict an authorized user to be an intruder than vice versa. 
+
+##### I spent around 12 hours doing the exam.
+
+
+### Statement of Compliance
+
+I affirm that I have had no conversation regarding this exam with any persons other than the instructor
+and/or the teaching assistant. Further, I certify that the attached work represents my own thinking. Any
+information, concepts, or words that originate from other sources are cited in accordance with University
+of Washington guidelines as published in the Academic Code (available on the course website). I am
+aware of the serious consequences that result from improper discussions with others or from the improper
+citation of work that is not my own.
+
+Brinda Sarkar
+
+12/14/2021
